@@ -16,8 +16,8 @@ PressIt is a minimal stress-relief web app. One button. Click it when you need t
 
 - **Frontend:** Next.js (App Router)
 - **Backend:** Next.js API Routes
-- **Database:** SQLite (local dev via `better-sqlite3`) → Vercel Postgres (deployed)
-- **Deployment:** Vercel (free tier)
+- **Database:** SQLite (local dev via `better-sqlite3`) → Vercel Postgres (production)
+- **Deployment:** Vercel (free tier) — public URL at `press-it.vercel.app`
 - **Repo:** GitHub (monorepo)
 
 ---

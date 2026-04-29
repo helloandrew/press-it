@@ -2,76 +2,65 @@
 
 > Press the button. Release the stress.
 
-PressIt is a minimal stress-relief web app. One button. Click it when you need to. It tracks how many times you've pressed today and all time.
-
----
-
-## Project Status
-
-🟡 Phase 0 — Setup in progress
+PressIt is a minimal stress-relief web app. One big button. Click it when you need to. It tracks how many times you've pressed today and all time for an anonymous browser user.
 
 ---
 
 ## Tech Stack
 
-- **Frontend:** Next.js (App Router)
-- **Backend:** Next.js API Routes
-- **Database:** SQLite (local dev via `better-sqlite3`) → Vercel Postgres (production)
-- **Deployment:** Vercel (free tier) — public URL at `press-it.vercel.app`
-- **Repo:** GitHub (monorepo)
+- **Frontend:** Next.js (App Router, TypeScript)
+- **Styling:** Tailwind CSS
+- **Backend:** Next.js route handlers
+- **Local DB:** SQLite via `better-sqlite3`
+- **Production DB:** Vercel Postgres
 
 ---
 
 ## Local Development
 
-> Setup instructions will be added in Phase 1 (Architecture).
-
----
-
-## Folder Structure
-
-```
-press-it/
-├── app/                  # Next.js App Router pages + components
-│   ├── page.tsx          # Main page (the button)
-│   ├── layout.tsx        # Root layout
-│   └── api/
-│       ├── click/        # POST /api/click — record a click
-│       └── stats/        # GET /api/stats — fetch today + all-time counts
-├── components/           # Reusable UI components (Button, CounterDisplay)
-├── lib/                  # Shared utilities
-│   ├── db.ts             # Database client (SQLite local / Postgres deployed)
-│   └── user.ts           # UUID generation + localStorage helpers
-├── db/
-│   └── migrations/       # SQL schema migrations
-├── public/               # Static assets
-├── .env.local.example    # Environment variable template
-├── .gitignore
-├── package.json
-├── tsconfig.json
-└── README.md
+```bash
+cp .env.local.example .env.local
+npm install
+npm run db:migrate
+npm run dev
 ```
 
----
-
-## Roadmap
-
-- [x] Phase 0 — Repo setup + skeleton
-- [ ] Phase 1 — Architecture brief (Ling Long)
-- [ ] Phase 2 — Visual brief (Theo → Ling Long)
-- [ ] Phase 3 — Build (Ling Long)
-- [ ] Phase 4 — QA (Jamal Jr.)
-- [ ] Phase 5 — Deploy to Vercel
-- [ ] Phase 6 — UAT sign-off (Andrew)
+Open <http://localhost:3000>.
 
 ---
 
-## Team
+## Scripts
 
-| Role | Agent |
-|------|-------|
-| Coordination | Nico |
-| Dev | Ling Long |
-| Research / Design Brief | Theo Sniff |
-| QA | Jamal Jr. |
-| Product | Andrew |
+- `npm run dev` — start the dev server
+- `npm run build` — production build
+- `npm run start` — run production build locally
+- `npm run lint` — lint the app
+- `npm run db:migrate` — apply `db/migrations/001_init.sql` to local SQLite
+
+---
+
+## Project Structure
+
+```text
+app/
+  api/
+    click/route.ts   # POST /api/click
+    stats/route.ts   # GET /api/stats
+  layout.tsx
+  page.tsx
+lib/
+  db.ts              # SQLite/Postgres adapter selection
+  taglines.ts        # rotating tagline pool
+  user.ts            # localStorage UUID helper
+db/
+  migrations/
+    001_init.sql
+```
+
+---
+
+## Notes
+
+- User identity is anonymous and stored in `localStorage`
+- `today` is calculated from the user's local timezone offset
+- Local SQLite DB file is created at `db/pressit.db`

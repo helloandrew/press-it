@@ -8,4 +8,8 @@ export const TAGLINES = [
   "The button has seen worse. Keep going.",
   "Stress level: slightly less catastrophic.",
   "HR would prefer this.",
+  "Let it out.",
+  "Your therapist doesn't need to know about this one.",
+  "Deep breaths are overrated. Press this instead.",
+  "Not a punching bag. Close enough.",
 ] as const;

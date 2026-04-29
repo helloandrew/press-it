@@ -211,8 +211,8 @@ export default function Home() {
     <main className="flex min-h-screen items-center justify-center px-6 py-10 text-center">
       <div className="flex w-full max-w-3xl flex-col items-center gap-6 sm:gap-8">
         <div className="space-y-3">
-          <p className="text-sm font-extrabold uppercase tracking-[0.24em] text-[#20232D]/70">
-            PressIt
+          <p className="text-sm font-extrabold tracking-[0.12em] text-[#20232D]/70">
+            Press It
           </p>
           <p className="max-w-xl text-lg font-medium leading-8 text-[#20232D]/82 sm:text-xl">
             {tagline}

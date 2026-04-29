@@ -3,7 +3,7 @@ import "server-only";
 import fs from "node:fs";
 import path from "node:path";
 
-import { sql } from "@vercel/postgres";
+import { Pool } from "pg";
 import Database from "better-sqlite3";
 
 export type Stats = {
@@ -88,41 +88,55 @@ function createSqliteAdapter(): DatabaseAdapter {
   };
 }
 
+let pgPool: Pool | null = null;
+
+function getPgPool(): Pool {
+  if (!pgPool) {
+    pgPool = new Pool({
+      connectionString: process.env.POSTGRES_URL ?? process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+    });
+  }
+  return pgPool;
+}
+
 function createPostgresAdapter(): DatabaseAdapter {
   return {
     async ensureUser(userUuid) {
-      await sql`
-        INSERT INTO users (uuid, first_seen_at, city)
-        VALUES (${userUuid}, ${new Date().toISOString()}, NULL)
-        ON CONFLICT (uuid) DO NOTHING
-      `;
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO users (uuid, first_seen_at, city)
+         VALUES ($1, $2, NULL)
+         ON CONFLICT (uuid) DO NOTHING`,
+        [userUuid, new Date().toISOString()]
+      );
     },
 
     async insertClick({ userUuid, localDate }) {
-      await sql`
-        INSERT INTO click_counts (user_uuid, date, count)
-        VALUES (${userUuid}, ${localDate}, 1)
-        ON CONFLICT (user_uuid, date) DO UPDATE SET count = click_counts.count + 1
-      `;
+      const pool = getPgPool();
+      await pool.query(
+        `INSERT INTO click_counts (user_uuid, date, count)
+         VALUES ($1, $2, 1)
+         ON CONFLICT (user_uuid, date) DO UPDATE SET count = click_counts.count + 1`,
+        [userUuid, localDate]
+      );
     },
 
     async getStats({ userUuid, localDate }) {
-      const todayResult = await sql<{ count: string }>`
-        SELECT COALESCE(SUM(count), 0)::text AS count
-        FROM click_counts
-        WHERE user_uuid = ${userUuid} AND date = ${localDate}
-      `;
-
-      const allTimeResult = await sql<{ count: string }>`
-        SELECT COALESCE(SUM(count), 0)::text AS count
-        FROM click_counts
-        WHERE user_uuid = ${userUuid}
-      `;
-
-      const globalTotalResult = await sql<{ count: string }>`
-        SELECT COALESCE(SUM(count), 0)::text AS count
-        FROM click_counts
-      `;
+      const pool = getPgPool();
+      const [todayResult, allTimeResult, globalTotalResult] = await Promise.all([
+        pool.query<{ count: string }>(
+          `SELECT COALESCE(SUM(count), 0)::text AS count FROM click_counts WHERE user_uuid = $1 AND date = $2`,
+          [userUuid, localDate]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COALESCE(SUM(count), 0)::text AS count FROM click_counts WHERE user_uuid = $1`,
+          [userUuid]
+        ),
+        pool.query<{ count: string }>(
+          `SELECT COALESCE(SUM(count), 0)::text AS count FROM click_counts`
+        ),
+      ]);
 
       return {
         today: Number(todayResult.rows[0]?.count ?? 0),

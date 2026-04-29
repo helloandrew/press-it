@@ -10,7 +10,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "PressIt",
+  title: "Press It",
   description: "Press the button. Release the stress.",
 };
 

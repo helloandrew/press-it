@@ -48,7 +48,7 @@ function CounterNumber({ value, bump }: { value: number; bump: boolean }) {
 
 export default function Home() {
   const [stats, setStats] = useState<Stats>(INITIAL_STATS);
-  const [taglineIndex, setTaglineIndex] = useState(0);
+  const [taglineIndex, setTaglineIndex] = useState(() => Math.floor(Math.random() * TAGLINES.length));
   const [bumps, setBumps] = useState<BumpState>({ today: false, allTime: false });
   const userUuidRef = useRef<string | null>(null);
   const pressCountSinceRotationRef = useRef(0);

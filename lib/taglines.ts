@@ -12,4 +12,8 @@ export const TAGLINES = [
   "Your therapist doesn't need to know about this one.",
   "Deep breaths are overrated. Press this instead.",
   "Not a punching bag. Close enough.",
+  "Press. Breathe. Repeat.",
+  "Press something.",
+  "Press away.",
+  "A button cheaper than therapy.",
 ] as const;

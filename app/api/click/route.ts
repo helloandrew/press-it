@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import { NextResponse } from "next/server";
 
 import { getDb } from "@/lib/db";
@@ -21,26 +19,16 @@ function isValidTimezoneOffset(value: number): boolean {
   return Number.isInteger(value) && value >= -840 && value <= 840;
 }
 
-function getUtcDayBounds(tzOffsetMinutes: number) {
+function getLocalDateString(tzOffsetMinutes: number) {
   const now = new Date();
   const localMillis = now.getTime() - tzOffsetMinutes * 60_000;
   const localDate = new Date(localMillis);
 
-  const dayStartUtc = new Date(
-    Date.UTC(
-      localDate.getUTCFullYear(),
-      localDate.getUTCMonth(),
-      localDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0
-    ) + tzOffsetMinutes * 60_000
-  );
+  const year = localDate.getUTCFullYear();
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(localDate.getUTCDate()).padStart(2, "0");
 
-  const dayEndUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60 * 1000);
-
-  return { dayStartUtc, dayEndUtc };
+  return `${year}-${month}-${day}`;
 }
 
 export async function POST(request: Request) {
@@ -59,18 +47,13 @@ export async function POST(request: Request) {
       );
     }
 
+    const localDate = getLocalDateString(tzOffsetMinutes);
     const db = getDb();
-    const clickedAt = new Date();
 
     await db.ensureUser(userUuid);
-    await db.insertClick({
-      id: randomUUID(),
-      userUuid,
-      clickedAt,
-    });
+    await db.insertClick({ userUuid, localDate });
 
-    const { dayStartUtc, dayEndUtc } = getUtcDayBounds(tzOffsetMinutes);
-    const stats = await db.getStats({ userUuid, dayStartUtc, dayEndUtc });
+    const stats = await db.getStats({ userUuid, localDate });
 
     return NextResponse.json({ ok: true, stats });
   } catch (error) {

@@ -14,26 +14,16 @@ function isValidTimezoneOffset(value: number): boolean {
   return Number.isInteger(value) && value >= -840 && value <= 840;
 }
 
-function getUtcDayBounds(tzOffsetMinutes: number) {
+function getLocalDateString(tzOffsetMinutes: number) {
   const now = new Date();
   const localMillis = now.getTime() - tzOffsetMinutes * 60_000;
   const localDate = new Date(localMillis);
 
-  const dayStartUtc = new Date(
-    Date.UTC(
-      localDate.getUTCFullYear(),
-      localDate.getUTCMonth(),
-      localDate.getUTCDate(),
-      0,
-      0,
-      0,
-      0
-    ) + tzOffsetMinutes * 60_000
-  );
+  const year = localDate.getUTCFullYear();
+  const month = String(localDate.getUTCMonth() + 1).padStart(2, "0");
+  const day = String(localDate.getUTCDate()).padStart(2, "0");
 
-  const dayEndUtc = new Date(dayStartUtc.getTime() + 24 * 60 * 60 * 1000);
-
-  return { dayStartUtc, dayEndUtc };
+  return `${year}-${month}-${day}`;
 }
 
 export async function GET(request: NextRequest) {
@@ -54,8 +44,8 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const { dayStartUtc, dayEndUtc } = getUtcDayBounds(tzOffsetMinutes);
-    const stats = await getDb().getStats({ userUuid, dayStartUtc, dayEndUtc });
+    const localDate = getLocalDateString(tzOffsetMinutes);
+    const stats = await getDb().getStats({ userUuid, localDate });
 
     return NextResponse.json({ ok: true, stats });
   } catch (error) {

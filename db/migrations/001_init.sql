@@ -4,12 +4,11 @@ CREATE TABLE IF NOT EXISTS users (
   city TEXT NULL
 );
 
-CREATE TABLE IF NOT EXISTS clicks (
-  id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS click_counts (
   user_uuid TEXT NOT NULL,
-  clicked_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (user_uuid) REFERENCES users(uuid)
+  date DATE NOT NULL,
+  count INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (user_uuid, date)
 );
 
-CREATE INDEX IF NOT EXISTS idx_clicks_user_uuid ON clicks(user_uuid);
-CREATE INDEX IF NOT EXISTS idx_clicks_user_uuid_clicked_at ON clicks(user_uuid, clicked_at);
+CREATE INDEX IF NOT EXISTS idx_click_counts_user_uuid ON click_counts(user_uuid);

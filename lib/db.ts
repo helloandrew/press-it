@@ -2,22 +2,20 @@ import "server-only";
 
 import fs from "node:fs";
 import path from "node:path";
-import Database from "better-sqlite3";
+
 import { sql } from "@vercel/postgres";
+import Database from "better-sqlite3";
 
 export type Stats = {
   today: number;
   allTime: number;
+  globalTotal: number;
 };
 
 export interface DatabaseAdapter {
   ensureUser(userUuid: string): Promise<void>;
-  insertClick(input: { id: string; userUuid: string; clickedAt: Date }): Promise<void>;
-  getStats(input: {
-    userUuid: string;
-    dayStartUtc: Date;
-    dayEndUtc: Date;
-  }): Promise<Stats>;
+  insertClick(input: { userUuid: string; localDate: string }): Promise<void>;
+  getStats(input: { userUuid: string; localDate: string }): Promise<Stats>;
 }
 
 type SqliteDatabase = Database.Database;
@@ -49,33 +47,42 @@ function createSqliteAdapter(): DatabaseAdapter {
       ).run(userUuid, new Date().toISOString());
     },
 
-    async insertClick({ id, userUuid, clickedAt }) {
+    async insertClick({ userUuid, localDate }) {
       db.prepare(
-        `INSERT INTO clicks (id, user_uuid, clicked_at)
-         VALUES (?, ?, ?)`
-      ).run(id, userUuid, clickedAt.toISOString());
+        `INSERT INTO click_counts (user_uuid, date, count)
+         VALUES (?, ?, 1)
+         ON CONFLICT (user_uuid, date) DO UPDATE SET count = count + 1`
+      ).run(userUuid, localDate);
     },
 
-    async getStats({ userUuid, dayStartUtc, dayEndUtc }) {
-      const allTimeRow = db
-        .prepare(`SELECT COUNT(*) AS count FROM clicks WHERE user_uuid = ?`)
-        .get(userUuid) as { count: number };
-
+    async getStats({ userUuid, localDate }) {
       const todayRow = db
         .prepare(
-          `SELECT COUNT(*) AS count
-           FROM clicks
-           WHERE user_uuid = ?
-             AND clicked_at >= ?
-             AND clicked_at < ?`
+          `SELECT COALESCE(SUM(count), 0) AS count
+           FROM click_counts
+           WHERE user_uuid = ? AND date = ?`
         )
-        .get(userUuid, dayStartUtc.toISOString(), dayEndUtc.toISOString()) as {
-        count: number;
-      };
+        .get(userUuid, localDate) as { count: number };
+
+      const allTimeRow = db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS count
+           FROM click_counts
+           WHERE user_uuid = ?`
+        )
+        .get(userUuid) as { count: number };
+
+      const globalTotalRow = db
+        .prepare(
+          `SELECT COALESCE(SUM(count), 0) AS count
+           FROM click_counts`
+        )
+        .get() as { count: number };
 
       return {
         today: Number(todayRow?.count ?? 0),
         allTime: Number(allTimeRow?.count ?? 0),
+        globalTotal: Number(globalTotalRow?.count ?? 0),
       };
     },
   };
@@ -91,31 +98,36 @@ function createPostgresAdapter(): DatabaseAdapter {
       `;
     },
 
-    async insertClick({ id, userUuid, clickedAt }) {
+    async insertClick({ userUuid, localDate }) {
       await sql`
-        INSERT INTO clicks (id, user_uuid, clicked_at)
-        VALUES (${id}, ${userUuid}, ${clickedAt.toISOString()})
+        INSERT INTO click_counts (user_uuid, date, count)
+        VALUES (${userUuid}, ${localDate}, 1)
+        ON CONFLICT (user_uuid, date) DO UPDATE SET count = click_counts.count + 1
       `;
     },
 
-    async getStats({ userUuid, dayStartUtc, dayEndUtc }) {
+    async getStats({ userUuid, localDate }) {
+      const todayResult = await sql<{ count: string }>`
+        SELECT COALESCE(SUM(count), 0)::text AS count
+        FROM click_counts
+        WHERE user_uuid = ${userUuid} AND date = ${localDate}
+      `;
+
       const allTimeResult = await sql<{ count: string }>`
-        SELECT COUNT(*)::text AS count
-        FROM clicks
+        SELECT COALESCE(SUM(count), 0)::text AS count
+        FROM click_counts
         WHERE user_uuid = ${userUuid}
       `;
 
-      const todayResult = await sql<{ count: string }>`
-        SELECT COUNT(*)::text AS count
-        FROM clicks
-        WHERE user_uuid = ${userUuid}
-          AND clicked_at >= ${dayStartUtc.toISOString()}
-          AND clicked_at < ${dayEndUtc.toISOString()}
+      const globalTotalResult = await sql<{ count: string }>`
+        SELECT COALESCE(SUM(count), 0)::text AS count
+        FROM click_counts
       `;
 
       return {
         today: Number(todayResult.rows[0]?.count ?? 0),
         allTime: Number(allTimeResult.rows[0]?.count ?? 0),
+        globalTotal: Number(globalTotalResult.rows[0]?.count ?? 0),
       };
     },
   };

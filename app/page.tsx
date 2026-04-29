@@ -8,17 +8,56 @@ import { getOrCreateUserUuid } from "@/lib/user";
 type Stats = {
   today: number;
   allTime: number;
+  globalTotal: number;
 };
 
 type BumpState = {
   today: boolean;
   allTime: boolean;
+  globalTotal: boolean;
 };
 
-const INITIAL_STATS: Stats = { today: 0, allTime: 0 };
+const INITIAL_STATS: Stats = { today: 0, allTime: 0, globalTotal: 0 };
 
 function getNextThreshold() {
   return Math.floor(Math.random() * 3) + 3;
+}
+
+function playClickSound() {
+  try {
+    const AudioContextCtor = window.AudioContext;
+
+    if (!AudioContextCtor) {
+      return;
+    }
+
+    const ctx = new AudioContextCtor();
+    const bufferSize = Math.floor(ctx.sampleRate * 0.025);
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+
+    for (let i = 0; i < bufferSize; i += 1) {
+      data[i] = (Math.random() * 4 - 1) * Math.pow(1 - i / bufferSize, 10);
+    }
+
+    const source = ctx.createBufferSource();
+    const g = ctx.createGain();
+    const filter = ctx.createBiquadFilter();
+
+    source.buffer = buffer;
+    filter.type = "highpass";
+    filter.frequency.value = 1800;
+    source.connect(filter);
+    filter.connect(g);
+    g.connect(ctx.destination);
+    g.gain.setValueAtTime(0.7, ctx.currentTime);
+    source.start();
+    source.onended = () => {
+      void ctx.close().catch(() => undefined);
+    };
+  } catch {
+    // silently ignore if audio context is blocked
+  }
 }
 
 function getNextTaglineIndex(currentIndex: number) {
@@ -41,7 +80,7 @@ function CounterNumber({ value, bump }: { value: number; bump: boolean }) {
         bump ? "scale-[1.02]" : "scale-100"
       }`}
     >
-      {value}
+      {value.toLocaleString()}
     </span>
   );
 }
@@ -49,7 +88,11 @@ function CounterNumber({ value, bump }: { value: number; bump: boolean }) {
 export default function Home() {
   const [stats, setStats] = useState<Stats>(INITIAL_STATS);
   const [taglineIndex, setTaglineIndex] = useState(0);
-  const [bumps, setBumps] = useState<BumpState>({ today: false, allTime: false });
+  const [bumps, setBumps] = useState<BumpState>({
+    today: false,
+    allTime: false,
+    globalTotal: false,
+  });
   const userUuidRef = useRef<string | null>(null);
   const pressCountSinceRotationRef = useRef(0);
   const nextRotationThresholdRef = useRef(getNextThreshold());
@@ -80,11 +123,6 @@ export default function Home() {
     statsRef.current = payload.stats;
     setStats(payload.stats);
   }
-
-  // Randomize tagline after hydration to avoid SSR mismatch
-  useEffect(() => {
-    setTaglineIndex(Math.floor(Math.random() * TAGLINES.length));
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -126,12 +164,12 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    if (!bumps.today && !bumps.allTime) {
+    if (!bumps.today && !bumps.allTime && !bumps.globalTotal) {
       return;
     }
 
     const timeoutId = window.setTimeout(() => {
-      setBumps({ today: false, allTime: false });
+      setBumps({ today: false, allTime: false, globalTotal: false });
     }, 150);
 
     return () => window.clearTimeout(timeoutId);
@@ -150,17 +188,20 @@ export default function Home() {
   }
 
   async function handlePress() {
+    playClickSound();
+
     const userUuid = userUuidRef.current ?? getOrCreateUserUuid();
     userUuidRef.current = userUuid;
 
     const optimisticStats = {
       today: statsRef.current.today + 1,
       allTime: statsRef.current.allTime + 1,
+      globalTotal: statsRef.current.globalTotal + 1,
     };
 
     statsRef.current = optimisticStats;
     setStats(optimisticStats);
-    setBumps({ today: true, allTime: true });
+    setBumps({ today: true, allTime: true, globalTotal: true });
     rotateTaglineIfNeeded();
 
     try {
@@ -189,14 +230,20 @@ export default function Home() {
         const nextStats = {
           today: Math.max(current.today, payload.stats.today),
           allTime: Math.max(current.allTime, payload.stats.allTime),
+          globalTotal: Math.max(current.globalTotal, payload.stats.globalTotal),
         };
         const todayChanged = nextStats.today !== current.today;
         const allTimeChanged = nextStats.allTime !== current.allTime;
+        const globalTotalChanged = nextStats.globalTotal !== current.globalTotal;
 
         statsRef.current = nextStats;
 
-        if (todayChanged || allTimeChanged) {
-          setBumps({ today: todayChanged, allTime: allTimeChanged });
+        if (todayChanged || allTimeChanged || globalTotalChanged) {
+          setBumps({
+            today: todayChanged,
+            allTime: allTimeChanged,
+            globalTotal: globalTotalChanged,
+          });
         }
 
         return nextStats;
@@ -238,6 +285,14 @@ export default function Home() {
           <span className="px-2 text-[#20232D]/45">·</span>
           All time: <CounterNumber value={stats.allTime} bump={bumps.allTime} />
         </p>
+
+        <div className="flex w-full max-w-sm flex-col items-center gap-3">
+          <div className="h-px w-full bg-[#20232D]/12" />
+          <p className="text-sm font-medium text-[#20232D]/60 sm:text-base">
+            <CounterNumber value={stats.globalTotal} bump={bumps.globalTotal} /> presses
+            worldwide 🌍
+          </p>
+        </div>
       </div>
     </main>
   );
